@@ -2,18 +2,21 @@
 //!
 //! This crate provides a CLI for interacting with GBA using clap and ratatui.
 
-use anyhow::Result;
+use anyhow::{Context as AnyhowContext, Result};
 use clap::Parser;
-use tracing::info;
+use std::path::PathBuf;
+use tracing::{Level, debug, info};
 use tracing_subscriber::{EnvFilter, fmt};
 
 mod cli;
+mod config;
 mod error;
+mod output;
 mod run;
 mod ui;
 
-use cli::Args;
-use cli::Command;
+use cli::{Args, Command};
+use config::ConfigManager;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,58 +25,118 @@ async fn main() -> Result<()> {
     // Initialize tracing
     init_tracing(&args)?;
 
+    debug!("GBA CLI starting with command: {:?}", args.command);
+
+    // Resolve the project path
+    let project_path = if args.path.as_os_str() == "." {
+        std::env::current_dir().context("Failed to get current directory")?
+    } else {
+        args.path
+    };
+
+    debug!("Project path: {}", project_path.display());
+
     // Execute command
     match args.command {
         Command::Init(init_args) => execute_init(init_args).await?,
-        Command::Run(run_args) => execute_run(run_args).await?,
-        Command::ListPrompts(list_args) => execute_list_prompts(list_args).await?,
-        Command::Prompt(prompt_args) => execute_prompt(prompt_args).await?,
+        Command::Run(run_args) => execute_run(project_path, run_args).await?,
+        Command::ListPrompts(list_args) => execute_list_prompts(project_path, list_args).await?,
+        Command::Prompt(prompt_args) => execute_prompt(project_path, prompt_args).await?,
     }
 
+    info!("GBA CLI completed successfully");
     Ok(())
 }
 
 /// Initialize tracing subscriber.
 fn init_tracing(args: &Args) -> Result<()> {
-    let filter = if args.verbose {
-        EnvFilter::from_default_env().add_directive(tracing::Level::DEBUG.into())
+    let log_level = if args.verbose {
+        Level::DEBUG
     } else {
-        EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into())
+        Level::INFO
     };
 
-    fmt().with_env_filter(filter).with_target(false).init();
+    let filter = EnvFilter::from_default_env()
+        .add_directive(log_level.into())
+        .add_directive("gba_core=info".parse()?)
+        .add_directive("gba_pm=info".parse()?)
+        .add_directive("gba_cli=info".parse()?);
+
+    fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .with_thread_ids(false)
+        .with_file(false)
+        .with_line_number(false)
+        .init();
 
     Ok(())
 }
 
 /// Execute init command.
-async fn execute_init(_args: cli::InitArgs) -> Result<()> {
+async fn execute_init(args: cli::InitArgs) -> Result<()> {
     info!("Initializing GBA project");
-    // TODO: Implement init logic
+
+    let project_path = args
+        .path
+        .unwrap_or_else(|| std::env::current_dir().expect("Failed to get current directory"));
+
+    run::init(&project_path, &args.main_branch, args.repo_url.as_deref()).await?;
+
     Ok(())
 }
 
 /// Execute run command.
-async fn execute_run(args: cli::RunArgs) -> Result<()> {
+async fn execute_run(project_path: PathBuf, args: cli::RunArgs) -> Result<()> {
     info!(
         feature = %args.feature,
         kind = %args.kind,
+        tui = args.tui,
+        resume = args.resume,
         "Running task"
     );
-    run::run(args).await?;
+
+    // Load configuration
+    let config = ConfigManager::load(&project_path).with_context(|| {
+        format!(
+            "Failed to load configuration from {}",
+            project_path.display()
+        )
+    })?;
+
+    run::run(config, args).await?;
+
     Ok(())
 }
 
 /// Execute list-prompts command.
-async fn execute_list_prompts(_args: cli::ListPromptsArgs) -> Result<()> {
+async fn execute_list_prompts(project_path: PathBuf, args: cli::ListPromptsArgs) -> Result<()> {
     info!("Listing available prompts");
-    // TODO: Implement list prompts logic
+
+    let config = ConfigManager::load(&project_path).with_context(|| {
+        format!(
+            "Failed to load configuration from {}",
+            project_path.display()
+        )
+    })?;
+
+    run::list_prompts(config, args.verbose)?;
+
     Ok(())
 }
 
 /// Execute prompt command.
-async fn execute_prompt(_args: cli::PromptArgs) -> Result<()> {
-    info!("Executing prompt");
-    // TODO: Implement prompt logic
+async fn execute_prompt(project_path: PathBuf, args: cli::PromptArgs) -> Result<()> {
+    info!("Executing prompt: {}", args.template);
+
+    let config = ConfigManager::load(&project_path).with_context(|| {
+        format!(
+            "Failed to load configuration from {}",
+            project_path.display()
+        )
+    })?;
+
+    run::execute_prompt(config, &args.template, &args.message).await?;
+
     Ok(())
 }
