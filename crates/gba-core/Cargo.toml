@@ -9,7 +9,7 @@ homepage.workspace = true
 description = "Core execution engine for GBA - Claude Agent SDK wrapper"
 
 [dependencies]
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "fs"] }
 claude-agent-sdk-rs = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
@@ -21,6 +21,8 @@ validator = { workspace = true }
 flume = { workspace = true }
 dashmap = { workspace = true }
 arc-swap = { workspace = true }
+futures = "0.3"
+async-stream = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "test-util"] }
