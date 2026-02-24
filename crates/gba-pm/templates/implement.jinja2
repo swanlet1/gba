@@ -1,0 +1,110 @@
+---
+systemPrompt: "You are an expert software developer implementing a feature according to a detailed plan."
+usePreset: true
+tools: []
+---
+
+You are implementing the feature: {{ feature_name }}
+
+## Feature Details
+
+Feature ID: {{ feature_id }}
+Description: {{ feature_description }}
+
+## Implementation Plan
+
+{{ implementation_plan }}
+
+## Repository Context
+
+Worktree branch: {{ worktree_branch }}
+
+## Instructions
+
+Implement the feature following the plan above. Work in the git worktree at: {{ worktree_path }}
+
+### During Implementation
+
+For each phase in the plan:
+1. Execute the steps in order
+2. Make meaningful git commits as you complete chunks of work
+   - Use descriptive commit messages (e.g., "feat: add user authentication", "fix: handle edge case in login")
+   - Follow conventional commit format: `<type>(<scope>): <description>`
+   - Types: feat, fix, docs, style, refactor, test, chore
+3. Run tests after each commit and ensure all pass
+4. Update the state file (.gba/features/{{ feature_id }}/state.yml) with current progress
+
+### Final Steps
+
+After completing all implementation phases:
+
+1. **Final Review**: Run a quick self-review of your changes
+2. **Create Pull Request**: Use `gh pr create` command to create a comprehensive PR
+
+The PR description must follow this format and include:
+
+```markdown
+## Summary
+[Brief description of what this PR accomplishes]
+
+## Changes
+[Bulleted list of main changes, organized by file or component]
+
+## Test Plan
+[Checklist of testing performed]
+- [ ] Unit tests pass locally
+- [ ] Integration tests pass locally
+- [ ] Manual testing completed for [specific scenarios]
+- [ ] Edge cases verified
+- [ ] No regressions detected
+
+## Breaking Changes & Migration Notes
+[Any breaking changes or migration steps required - or "None"]
+
+## Documentation
+[List any documentation changes or state if none]
+
+## Checklist
+- [ ] All tests pass
+- [ ] Code follows project conventions
+- [ ] Self-review completed
+- [ ] No unnecessary dependencies added
+```
+
+Example `gh pr create` command:
+```bash
+gh pr create \
+  --title "feat: {{ feature_name }}" \
+  --body "$(cat <<'EOF'
+## Summary
+[Your summary here]
+
+## Changes
+- [Change 1]
+- [Change 2]
+
+## Test Plan
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+
+## Breaking Changes & Migration Notes
+None
+
+## Documentation
+Updated README.md with new feature documentation
+
+## Checklist
+- [ ] All tests pass
+- [ ] Code follows project conventions
+- [ ] Self-review completed
+- [ ] No unnecessary dependencies added
+EOF
+)"
+```
+
+3. **Save PR Link**: After the PR is created, save the PR URL in the state file:
+   ```yaml
+   result:
+     pr_link: "https://github.com/user/repo/pull/123"
+   ```

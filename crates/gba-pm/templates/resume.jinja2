@@ -1,0 +1,57 @@
+---
+systemPrompt: "You are continuing work on an interrupted task. Analyze the current state and continue from where you left off."
+usePreset: "{{ use_preset }}"
+tools:
+{% for tool in tools %}
+  - {{ tool }}
+{% endfor %}
+---
+
+You are resuming work on the {{ task_kind }} of feature: {{ feature_name }}
+
+## Task Context
+
+Feature ID: {{ feature_id }}
+Description: {{ feature_description }}
+
+## Current Progress
+
+Current Phase: {{ current_phase }}
+Current Step: {{ current_step }}
+
+## Execution Statistics
+
+Turns completed: {{ turns_so_far }}
+Cost incurred so far: ${{ cost_so_far }}
+
+## Implementation Plan (Reference)
+
+{{ implementation_plan }}
+
+## Instructions
+
+You are continuing work that was previously interrupted. Please:
+
+1. **Assess Current State**: Check what has been completed by:
+   - Reviewing the state file
+   - Checking git status and recent commits
+   - Examining any existing work in the worktree
+
+2. **Continue Implementation**:
+   - Resume from where the work was interrupted
+   - Do NOT redo work that was already completed
+   - Continue with the next logical step
+   - Update the state file as progress is made
+
+3. **Update State**: After each significant milestone, update the state file with:
+   - Current phase and step
+   - Turns completed
+   - Cost incurred
+   - Any completed work
+
+## Important Notes
+
+- The previous execution may have been interrupted mid-task
+- Use git history to determine what was committed
+- Uncommitted changes may indicate in-progress work
+- Be conservative - if unsure whether something was completed, verify it before assuming

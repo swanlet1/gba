@@ -2,56 +2,78 @@
 //!
 //! This crate provides a CLI for interacting with GBA using clap and ratatui.
 
+use anyhow::Result;
 use clap::Parser;
+use tracing::info;
+use tracing_subscriber::{EnvFilter, fmt};
+
+mod cli;
+mod error;
+mod run;
+mod ui;
+
+use cli::Args;
+use cli::Command;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // TODO: Implement CLI logic based on args
-    println!("GBA CLI v{}", env!("CARGO_PKG_VERSION"));
+    // Initialize tracing
+    init_tracing(&args)?;
 
-    if let Some(command) = args.command {
-        println!("Subcommand: {:?}", command);
+    // Execute command
+    match args.command {
+        Command::Init(init_args) => execute_init(init_args).await?,
+        Command::Run(run_args) => execute_run(run_args).await?,
+        Command::ListPrompts(list_args) => execute_list_prompts(list_args).await?,
+        Command::Prompt(prompt_args) => execute_prompt(prompt_args).await?,
     }
 
     Ok(())
 }
 
-/// Command line arguments for GBA CLI.
-#[derive(Parser, Debug)]
-#[command(author, version, about)]
-struct Args {
-    /// Subcommand to execute.
-    #[command(subcommand)]
-    command: Option<Command>,
+/// Initialize tracing subscriber.
+fn init_tracing(args: &Args) -> Result<()> {
+    let filter = if args.verbose {
+        EnvFilter::from_default_env().add_directive(tracing::Level::DEBUG.into())
+    } else {
+        EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into())
+    };
+
+    fmt().with_env_filter(filter).with_target(false).init();
+
+    Ok(())
 }
 
-/// Available subcommands.
-#[derive(Debug, clap::Subcommand)]
-enum Command {
-    /// Initialize a new GBA project.
-    Init(InitArgs),
-    /// Run an agent on a repository.
-    Run(RunArgs),
+/// Execute init command.
+async fn execute_init(_args: cli::InitArgs) -> Result<()> {
+    info!("Initializing GBA project");
+    // TODO: Implement init logic
+    Ok(())
 }
 
-/// Arguments for the init subcommand.
-#[derive(Debug, clap::Args)]
-struct InitArgs {
-    /// Path to initialize the project.
-    #[arg(short, long)]
-    path: Option<String>,
+/// Execute run command.
+async fn execute_run(args: cli::RunArgs) -> Result<()> {
+    info!(
+        feature = %args.feature,
+        kind = %args.kind,
+        "Running task"
+    );
+    run::run(args).await?;
+    Ok(())
 }
 
-/// Arguments for the run subcommand.
-#[derive(Debug, clap::Args)]
-struct RunArgs {
-    /// Repository path to work on.
-    #[arg(short, long)]
-    repo: String,
+/// Execute list-prompts command.
+async fn execute_list_prompts(_args: cli::ListPromptsArgs) -> Result<()> {
+    info!("Listing available prompts");
+    // TODO: Implement list prompts logic
+    Ok(())
+}
 
-    /// Agent configuration file.
-    #[arg(short, long)]
-    config: Option<String>,
+/// Execute prompt command.
+async fn execute_prompt(_args: cli::PromptArgs) -> Result<()> {
+    info!("Executing prompt");
+    // TODO: Implement prompt logic
+    Ok(())
 }

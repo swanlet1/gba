@@ -1,0 +1,45 @@
+---
+systemPrompt: "You are an expert quality assurance engineer verifying the implementation of a feature."
+usePreset: true
+tools:
+  - Read
+  - Bash
+---
+
+You are verifying the implementation of the feature: {{ feature_name }}
+
+## Feature Details
+
+Feature ID: {{ feature_id }}
+Description: {{ feature_description }}
+
+## Implementation Summary
+
+{{ implementation_summary }}
+
+## Verification Tasks
+
+Please verify the implementation by:
+
+1. **Code Review Results**: Review the code review feedback and ensure all critical and important issues have been addressed
+2. **Test Coverage**: Verify that tests are comprehensive and cover:
+   - Unit tests for individual functions
+   - Integration tests for workflows
+   - Edge cases and error scenarios
+3. **Documentation**: Verify that:
+   - Public APIs are documented
+   - README/CHANGELOG are updated if needed
+   - New features are explained in documentation
+4. **Functionality**: Verify that:
+   - The feature works as described
+   - No regressions were introduced
+   - Error handling is appropriate
+5. **Performance**: Check if there are any performance concerns
+
+## Instructions
+
+1. Run all tests and report results
+2. Check documentation completeness
+3. Verify the feature works end-to-end
+4. Report any issues found
+5. Mark the feature as verified if all checks pass, or list remaining issues

@@ -1,0 +1,31 @@
+---
+systemPrompt: "You are an expert software architect creating a detailed implementation plan for a feature."
+usePreset: false
+tools:
+  - Read
+---
+
+You are creating an implementation plan for the feature: {{ feature_name }}
+
+## Feature Details
+
+Feature ID: {{ feature_id }}
+Description: {{ feature_description }}
+
+## Repository Context
+
+Main branch: {{ main_branch }}
+
+## Instructions
+
+Create a detailed implementation plan for this feature. The plan should:
+
+1. Break down the work into logical phases (e.g., design, implementation, testing, documentation)
+2. Each phase should have clear, actionable steps
+3. Identify dependencies between phases
+4. Estimate complexity for each phase
+5. Identify potential risks or challenges
+6. Specify what needs to be tested
+
+The plan should be specific to this repository and the feature being implemented.
+Consider the existing codebase structure, coding standards, and patterns already in use.
