@@ -20,6 +20,14 @@ pub enum PromptError {
     #[error("Invalid template syntax: {0}")]
     InvalidSyntax(String),
 
+    /// Invalid context variable.
+    #[error("Invalid context variable: {0}")]
+    InvalidVariable(String),
+
+    /// Missing required context variable.
+    #[error("Missing required context variable: {0}")]
+    MissingVariable(String),
+
     /// IO error.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -27,4 +35,8 @@ pub enum PromptError {
     /// Serialization/deserialization error.
     #[error("Serialization error: {0}")]
     Serde(#[from] serde_json::Error),
+
+    /// YAML parsing error.
+    #[error("YAML error: {0}")]
+    Yaml(#[from] serde_yaml::Error),
 }

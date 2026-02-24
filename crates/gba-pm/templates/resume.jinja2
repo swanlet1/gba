@@ -1,6 +1,6 @@
 ---
 systemPrompt: "You are continuing work on an interrupted task. Analyze the current state and continue from where you left off."
-usePreset: "{{ use_preset }}"
+usePreset: {{ "true" if use_preset else "false" }}
 tools:
 {% for tool in tools %}
   - {{ tool }}
