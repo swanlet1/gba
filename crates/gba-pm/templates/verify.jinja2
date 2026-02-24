@@ -1,9 +1,7 @@
 ---
 systemPrompt: "You are an expert quality assurance engineer verifying the implementation of a feature."
 usePreset: true
-tools:
-  - Read
-  - Bash
+tools: []
 ---
 
 You are verifying the implementation of the feature: {{ feature_name }}
@@ -21,20 +19,20 @@ Description: {{ feature_description }}
 
 Please verify the implementation by:
 
-1. **Code Review Results**: Review the code review feedback and ensure all critical and important issues have been addressed
-2. **Test Coverage**: Verify that tests are comprehensive and cover:
+1. Code Review Results: Review the code review feedback and ensure all critical and important issues have been addressed
+2. Test Coverage: Verify that tests are comprehensive and cover:
    - Unit tests for individual functions
    - Integration tests for workflows
    - Edge cases and error scenarios
-3. **Documentation**: Verify that:
+3. Documentation: Verify that:
    - Public APIs are documented
    - README/CHANGELOG are updated if needed
    - New features are explained in documentation
-4. **Functionality**: Verify that:
+4. Functionality: Verify that:
    - The feature works as described
    - No regressions were introduced
    - Error handling is appropriate
-5. **Performance**: Check if there are any performance concerns
+5. Performance: Check if there are any performance concerns
 
 ## Instructions
 
@@ -43,3 +41,57 @@ Please verify the implementation by:
 3. Verify the feature works end-to-end
 4. Report any issues found
 5. Mark the feature as verified if all checks pass, or list remaining issues
+
+## Verification Report Format
+
+```markdown
+# Verification Report: {{ feature_name }}
+
+## Test Results
+
+### Unit Tests
+- [Pass/Fail] [Test name]
+...
+
+### Integration Tests
+- [Pass/Fail] [Test name]
+...
+
+### Manual Testing
+- [Pass/Fail] [Test scenario]
+...
+
+## Code Quality Assessment
+
+### Documentation
+- [ ] All public APIs documented
+- [ ] README updated if needed
+- [ ] CHANGELOG updated if needed
+
+### Code Style
+- [ ] Follows project conventions
+- [ ] No clippy warnings
+- [ ] Proper error handling
+
+### Performance
+- [ ] No performance regressions
+- [ ] Efficient algorithms used
+
+## Issues Found
+
+[List any issues found, categorized by severity]
+
+- **Critical**: [Issue]
+- **Important**: [Issue]
+- **Minor**: [Issue]
+
+## Verification Status
+
+[VERIFIED / NEEDS WORK / FAILED]
+
+## Recommendations
+
+[Any recommendations for improvement]
+```
+
+Please proceed with the verification.

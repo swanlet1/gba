@@ -18,6 +18,7 @@ Description: {{ feature_description }}
 ## Repository Context
 
 Worktree branch: {{ worktree_branch }}
+Worktree path: {{ worktree_path }}
 
 ## Instructions
 
@@ -28,8 +29,8 @@ Implement the feature following the plan above. Work in the git worktree at: {{ 
 For each phase in the plan:
 1. Execute the steps in order
 2. Make meaningful git commits as you complete chunks of work
-   - Use descriptive commit messages (e.g., "feat: add user authentication", "fix: handle edge case in login")
-   - Follow conventional commit format: `<type>(<scope>): <description>`
+   - Use descriptive commit messages
+   - Follow conventional commit format: type(scope): description
    - Types: feat, fix, docs, style, refactor, test, chore
 3. Run tests after each commit and ensure all pass
 4. Update the state file (.gba/features/{{ feature_id }}/state.yml) with current progress
@@ -38,12 +39,11 @@ For each phase in the plan:
 
 After completing all implementation phases:
 
-1. **Final Review**: Run a quick self-review of your changes
-2. **Create Pull Request**: Use `gh pr create` command to create a comprehensive PR
+1. Final Review: Run a quick self-review of your changes
+2. Create Pull Request: Use gh pr create command to create a comprehensive PR
 
-The PR description must follow this format and include:
+The PR description must follow this format:
 
-```markdown
 ## Summary
 [Brief description of what this PR accomplishes]
 
@@ -52,11 +52,11 @@ The PR description must follow this format and include:
 
 ## Test Plan
 [Checklist of testing performed]
-- [ ] Unit tests pass locally
-- [ ] Integration tests pass locally
-- [ ] Manual testing completed for [specific scenarios]
-- [ ] Edge cases verified
-- [ ] No regressions detected
+- Unit tests pass locally
+- Integration tests pass locally
+- Manual testing completed
+- Edge cases verified
+- No regressions detected
 
 ## Breaking Changes & Migration Notes
 [Any breaking changes or migration steps required - or "None"]
@@ -65,46 +65,18 @@ The PR description must follow this format and include:
 [List any documentation changes or state if none]
 
 ## Checklist
-- [ ] All tests pass
-- [ ] Code follows project conventions
-- [ ] Self-review completed
-- [ ] No unnecessary dependencies added
-```
+- All tests pass
+- Code follows project conventions
+- Self-review completed
+- No unnecessary dependencies added
 
-Example `gh pr create` command:
-```bash
-gh pr create \
-  --title "feat: {{ feature_name }}" \
-  --body "$(cat <<'EOF'
-## Summary
-[Your summary here]
+3. Save PR Link: After the PR is created, save the PR URL in the state file
 
-## Changes
-- [Change 1]
-- [Change 2]
+## Important Notes
 
-## Test Plan
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
+- Always follow the existing code style and conventions in this repository
+- Run cargo build, cargo test, and cargo clippy before creating the PR
+- Make sure all pre-commit hooks pass before creating the PR
+- The PR should be created from the worktree branch to {{ main_branch }}
 
-## Breaking Changes & Migration Notes
-None
-
-## Documentation
-Updated README.md with new feature documentation
-
-## Checklist
-- [ ] All tests pass
-- [ ] Code follows project conventions
-- [ ] Self-review completed
-- [ ] No unnecessary dependencies added
-EOF
-)"
-```
-
-3. **Save PR Link**: After the PR is created, save the PR URL in the state file:
-   ```yaml
-   result:
-     pr_link: "https://github.com/user/repo/pull/123"
-   ```
+Please proceed with implementing the feature.

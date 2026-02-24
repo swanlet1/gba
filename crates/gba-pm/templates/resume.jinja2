@@ -1,6 +1,6 @@
 ---
 systemPrompt: "You are continuing work on an interrupted task. Analyze the current state and continue from where you left off."
-usePreset: {{ "true" if use_preset else "false" }}
+usePreset: {{ use_preset }}
 tools:
 {% for tool in tools %}
   - {{ tool }}
@@ -32,18 +32,18 @@ Cost incurred so far: ${{ cost_so_far }}
 
 You are continuing work that was previously interrupted. Please:
 
-1. **Assess Current State**: Check what has been completed by:
+1. Assess Current State: Check what has been completed by:
    - Reviewing the state file
    - Checking git status and recent commits
    - Examining any existing work in the worktree
 
-2. **Continue Implementation**:
+2. Continue Implementation:
    - Resume from where the work was interrupted
    - Do NOT redo work that was already completed
    - Continue with the next logical step
    - Update the state file as progress is made
 
-3. **Update State**: After each significant milestone, update the state file with:
+3. Update State: After each significant milestone, update the state file with:
    - Current phase and step
    - Turns completed
    - Cost incurred
@@ -55,3 +55,10 @@ You are continuing work that was previously interrupted. Please:
 - Use git history to determine what was committed
 - Uncommitted changes may indicate in-progress work
 - Be conservative - if unsure whether something was completed, verify it before assuming
+
+## Repository Context
+
+Worktree path: {{ worktree_path }}
+Worktree branch: {{ worktree_branch }}
+
+Please continue the {{ task_kind }} task from where it was left off.

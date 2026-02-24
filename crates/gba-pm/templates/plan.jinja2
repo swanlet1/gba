@@ -1,8 +1,7 @@
 ---
 systemPrompt: "You are an expert software architect creating a detailed implementation plan for a feature."
-usePreset: false
-tools:
-  - Read
+usePreset: true
+tools: []
 ---
 
 You are creating an implementation plan for the feature: {{ feature_name }}
@@ -29,3 +28,48 @@ Create a detailed implementation plan for this feature. The plan should:
 
 The plan should be specific to this repository and the feature being implemented.
 Consider the existing codebase structure, coding standards, and patterns already in use.
+
+## Plan Format
+
+Please provide the plan in the following format:
+
+```markdown
+# Implementation Plan: {{ feature_name }}
+
+## Overview
+[Brief summary of what will be implemented]
+
+## Phases
+
+### Phase 1: [Phase Name]
+**Complexity:** Low/Medium/High
+
+**Steps:**
+1. [First step]
+2. [Second step]
+...
+
+**Dependencies:** None/[Other phases]
+
+**Risks:** [Any potential risks]
+
+### Phase 2: [Phase Name]
+...
+
+## Testing Requirements
+
+- [ ] Unit tests for [specific components]
+- [ ] Integration tests for [specific workflows]
+- [ ] Manual testing for [specific scenarios]
+
+## Risk Assessment
+
+[List any identified risks and mitigation strategies]
+
+## Success Criteria
+
+- [Feature requirement 1]
+- [Feature requirement 2]
+```
+
+Please create the implementation plan now.
