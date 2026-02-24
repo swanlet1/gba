@@ -1,0 +1,32 @@
+[package]
+name = "gba-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Command line interface for GBA"
+
+[[bin]]
+name = "gba"
+path = "src/main.rs"
+
+[dependencies]
+gba-core = { path = "../../crates/gba-core" }
+gba-pm = { path = "../../crates/gba-pm" }
+clap = { workspace = true, features = ["derive", "std", "env", "help"] }
+ratatui = { workspace = true, features = ["crossterm", "serde", "all-widgets"] }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+validator = { workspace = true }
+arc-swap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "test-util"] }

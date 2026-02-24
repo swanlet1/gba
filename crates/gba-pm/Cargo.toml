@@ -1,0 +1,21 @@
+[package]
+name = "gba-pm"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Prompt manager for GBA using Minijinja templating"
+
+[dependencies]
+minijinja = { workspace = true, features = ["loader", "unstable_machinery"] }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+validator = { workspace = true }
+
+[dev-dependencies]
