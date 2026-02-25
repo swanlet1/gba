@@ -97,6 +97,36 @@ impl ConfigManager {
         })
     }
 
+    /// Try to load configuration from a project directory.
+    ///
+    /// Returns `None` if the configuration cannot be loaded, without errors.
+    ///
+    /// # Arguments
+    ///
+    /// * `project_path` - Path to the project directory.
+    #[must_use]
+    pub fn try_load(project_path: &Path) -> Option<Self> {
+        if !project_path.exists() {
+            return None;
+        }
+
+        if !Self::is_gba_project(project_path) {
+            return None;
+        }
+
+        let config_path = Self::config_file_path(project_path);
+        if !config_path.exists() {
+            return None;
+        }
+
+        let config = ProjectConfig::load_from_file(&config_path).ok()?;
+
+        Some(Self {
+            project_path: project_path.to_path_buf(),
+            config,
+        })
+    }
+
     /// Get the project path.
     #[must_use]
     pub fn project_path(&self) -> &Path {

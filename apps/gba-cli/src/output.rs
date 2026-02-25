@@ -27,6 +27,7 @@ impl OutputFormatter {
     }
 
     /// Print a success message.
+    #[allow(dead_code)]
     pub fn success(&self, message: &str) {
         let prefix = if self.colors_enabled {
             "\x1b[32m✓\x1b[0m"
@@ -48,6 +49,7 @@ impl OutputFormatter {
     }
 
     /// Print a warning message.
+    #[allow(dead_code)]
     pub fn warning(&self, message: &str) {
         let prefix = if self.colors_enabled {
             "\x1b[33m⚠\x1b[0m"
@@ -74,6 +76,7 @@ impl OutputFormatter {
     }
 
     /// Print a subsection header.
+    #[allow(dead_code)]
     pub fn subsection(&self, title: &str) {
         println!("\n{}", Self::underline(title, self.colors_enabled));
     }
@@ -226,6 +229,7 @@ impl OutputFormatter {
     }
 
     /// Helper function to create underlined text.
+    #[allow(dead_code)]
     fn underline(text: &str, colors_enabled: bool) -> String {
         if colors_enabled {
             format!("\x1b[4m{}\x1b[0m", text)

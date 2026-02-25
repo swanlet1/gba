@@ -14,11 +14,9 @@ use crate::error::{CliError, Result as CliResult};
 use crate::output::OutputFormatter;
 use crate::ui::Tui;
 
-/// Output formatter instance.
-static OUTPUT: std::sync::OnceLock<OutputFormatter> = std::sync::OnceLock::new();
-
 /// Get the output formatter.
 fn output() -> &'static OutputFormatter {
+    static OUTPUT: std::sync::OnceLock<OutputFormatter> = std::sync::OnceLock::new();
     OUTPUT.get_or_init(OutputFormatter::new)
 }
 
@@ -35,26 +33,17 @@ fn output() -> &'static OutputFormatter {
 /// Returns an error if initialization fails.
 #[instrument(skip(project_path))]
 pub async fn init(project_path: &Path, main_branch: &str, repo_url: Option<&str>) -> CliResult<()> {
-    let out = output();
-
     info!("Initializing GBA project at {}", project_path.display());
 
     // Check if .gba directory already exists
     let gba_dir = project_path.join(".gba");
     if gba_dir.exists() {
-        out.warning("GBA project already initialized");
+        debug!(
+            "GBA project already initialized at {}",
+            project_path.display()
+        );
         return Ok(());
     }
-
-    out.section("Initializing GBA Project");
-    out.info(&format!("Path: {}", project_path.display()));
-    out.info(&format!("Main branch: {}", main_branch));
-    if let Some(url) = repo_url {
-        out.info(&format!("Repository: {}", url));
-    }
-
-    // Create .gba directory structure
-    out.info("Creating directory structure...");
 
     let templates_dir = gba_dir.join("templates");
     let features_dir = gba_dir.join("features");
@@ -85,7 +74,7 @@ pub async fn init(project_path: &Path, main_branch: &str, repo_url: Option<&str>
     let final_repo_url = repo_url.or(detected_url.as_deref()).unwrap_or("unknown");
 
     // Create default configuration
-    out.info("Creating configuration file...");
+    debug!("Creating default configuration file");
 
     let config = ProjectConfig {
         version: "1.0".to_string(),
@@ -162,9 +151,11 @@ limits:
     let config_path = ConfigManager::config_file_path(project_path);
     fs::write(&config_path, config_yaml)?;
 
-    out.success("GBA project initialized successfully!");
-    out.info(&format!("Configuration file: {}", config_path.display()));
-    out.info("You can now run 'gba run' to execute tasks.");
+    info!(
+        "GBA project initialized successfully at {}",
+        project_path.display()
+    );
+    debug!("Configuration file: {}", config_path.display());
 
     Ok(())
 }
@@ -195,21 +186,12 @@ fn detect_repo_url(project_path: &Path) -> Option<String> {
 /// Returns an error if execution fails.
 #[instrument(skip(config))]
 pub async fn run(config: ConfigManager, args: RunArgs) -> CliResult<()> {
-    let out = output();
-
     info!(
         feature = %args.feature,
         kind = %args.kind,
         tui = args.tui,
         resume = args.resume,
         "Starting run command"
-    );
-
-    // Display feature information
-    out.feature_info(
-        &args.feature,
-        &format!("{:04}", feature_id_from_name(&args.feature)),
-        args.description.as_deref(),
     );
 
     // Check if resuming or starting fresh
@@ -232,23 +214,21 @@ pub async fn run(config: ConfigManager, args: RunArgs) -> CliResult<()> {
     let context = build_run_context(&config, &args)?;
 
     // Get the prompt
-    out.subsection("Rendering Prompt");
-    let prompt = prompt_manager.get_prompt(template_name, &context)?;
+    debug!("Rendering prompt template: {}", template_name);
+    let _prompt = prompt_manager.get_prompt(template_name, &context)?;
     debug!("Prompt rendered successfully");
-
-    out.prompt_output(template_name, &prompt);
 
     // In TUI mode, start the TUI
     if args.tui {
-        out.info("Starting TUI mode...");
+        debug!("Starting TUI mode");
         let mut tui = Tui::new()?;
         tui.draw()?;
         tui.exit()?;
-        out.success("TUI completed");
+        debug!("TUI completed");
     } else {
-        out.info("Executing task (non-TUI mode)...");
+        debug!("Executing task (non-TUI mode)");
         // TODO: Integrate with gba-core Agent for actual execution
-        out.success("Task would be executed here");
+        debug!("Task would be executed here");
     }
 
     Ok(())
@@ -265,8 +245,6 @@ pub async fn run(config: ConfigManager, args: RunArgs) -> CliResult<()> {
 ///
 /// Returns an error if listing fails.
 pub fn list_prompts(config: ConfigManager, verbose: bool) -> CliResult<()> {
-    let out = output();
-
     info!("Listing available prompts");
 
     // Initialize prompt manager
@@ -276,10 +254,13 @@ pub fn list_prompts(config: ConfigManager, verbose: bool) -> CliResult<()> {
     let templates = prompt_manager.list_prompts();
 
     if templates.is_empty() {
-        out.warning("No templates found");
+        debug!("No templates found");
         return Ok(());
     }
 
+    debug!("Found {} templates", templates.len());
+    // Still need to output to console for user-visible command
+    let out = output();
     out.prompt_list(&templates, verbose);
 
     Ok(())
@@ -298,8 +279,6 @@ pub fn list_prompts(config: ConfigManager, verbose: bool) -> CliResult<()> {
 /// Returns an error if execution fails.
 #[instrument(skip(config))]
 pub async fn execute_prompt(config: ConfigManager, template: &str, message: &str) -> CliResult<()> {
-    let out = output();
-
     info!("Executing prompt: {}", template);
 
     // Initialize prompt manager
@@ -315,12 +294,14 @@ pub async fn execute_prompt(config: ConfigManager, template: &str, message: &str
     let context = PromptContext::new(repo_path, "main", message);
 
     // Get the prompt
+    debug!("Rendering prompt template: {}", template);
     let prompt = prompt_manager.get_prompt(template, &context)?;
 
+    // Still need to output to console for user-visible command
+    let out = output();
     out.prompt_output(template, &prompt);
 
-    // TODO: Integrate with gba-core Agent for actual execution
-    out.info("Prompt would be sent to agent for execution");
+    debug!("Prompt would be sent to agent for execution");
 
     Ok(())
 }

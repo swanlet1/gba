@@ -214,6 +214,14 @@ pub struct LoggingConfig {
     /// Log format.
     #[serde(default = "default_log_format")]
     pub format: String,
+
+    /// Log file path (empty for stdout/stderr only).
+    #[serde(default)]
+    pub file: String,
+
+    /// Whether to also log to stdout/stderr when file logging is enabled.
+    #[serde(default = "default_log_to_console")]
+    pub log_to_console: bool,
 }
 
 fn default_log_level() -> String {
@@ -222,6 +230,10 @@ fn default_log_level() -> String {
 
 fn default_log_format() -> String {
     "human".to_string()
+}
+
+fn default_log_to_console() -> bool {
+    true
 }
 
 /// Worktree configuration.

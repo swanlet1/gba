@@ -4,9 +4,9 @@
 
 use anyhow::{Context as AnyhowContext, Result};
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{Level, debug, info};
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 mod cli;
 mod config;
@@ -44,7 +44,6 @@ async fn main() -> Result<()> {
         Command::Prompt(prompt_args) => execute_prompt(project_path, prompt_args).await?,
     }
 
-    info!("GBA CLI completed successfully");
     Ok(())
 }
 
@@ -62,21 +61,87 @@ fn init_tracing(args: &Args) -> Result<()> {
         .add_directive("gba_pm=info".parse()?)
         .add_directive("gba_cli=info".parse()?);
 
-    fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .with_thread_ids(false)
-        .with_file(false)
-        .with_line_number(false)
-        .init();
+    // Check if we have a config with log file settings
+    let project_path = if args.path.as_os_str() == "." {
+        std::env::current_dir().context("Failed to get current directory")?
+    } else {
+        args.path.clone()
+    };
+
+    // Try to load config for log file settings
+    let log_file = if let Some(config) = ConfigManager::try_load(&project_path) {
+        let cfg = config.config();
+        if !cfg.logging.file.is_empty() {
+            Some(Path::new(&cfg.logging.file).to_path_buf())
+        } else {
+            // Default to .gba/logs/gba.log if file is empty but directory exists
+            let gba_dir = project_path.join(".gba");
+            if gba_dir.exists() {
+                Some(gba_dir.join("logs").join("gba.log"))
+            } else {
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref file_path) = log_file {
+        // Create parent directory if needed
+        if let Some(parent) = file_path.parent() {
+            std::fs::create_dir_all(parent).context("Failed to create log directory")?;
+        }
+
+        // File appender
+        let file_appender = tracing_appender::rolling::daily(
+            file_path.parent().unwrap_or(Path::new(".")),
+            file_path
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("gba.log")),
+        );
+
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stdout)
+                    .with_ansi(true)
+                    .with_target(false)
+                    .with_thread_ids(false)
+                    .with_file(false)
+                    .with_line_number(false),
+            )
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(file_appender)
+                    .with_ansi(false)
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_file(true)
+                    .with_line_number(true),
+            )
+            .init();
+    } else {
+        // Console only logging
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stdout)
+                    .with_ansi(true)
+                    .with_target(false)
+                    .with_thread_ids(false)
+                    .with_file(false)
+                    .with_line_number(false),
+            )
+            .init();
+    }
 
     Ok(())
 }
 
 /// Execute init command.
 async fn execute_init(args: cli::InitArgs) -> Result<()> {
-    info!("Initializing GBA project");
-
     let project_path = args
         .path
         .unwrap_or_else(|| std::env::current_dir().expect("Failed to get current directory"));
@@ -88,14 +153,6 @@ async fn execute_init(args: cli::InitArgs) -> Result<()> {
 
 /// Execute run command.
 async fn execute_run(project_path: PathBuf, args: cli::RunArgs) -> Result<()> {
-    info!(
-        feature = %args.feature,
-        kind = %args.kind,
-        tui = args.tui,
-        resume = args.resume,
-        "Running task"
-    );
-
     // Load configuration
     let config = ConfigManager::load(&project_path).with_context(|| {
         format!(
@@ -111,8 +168,6 @@ async fn execute_run(project_path: PathBuf, args: cli::RunArgs) -> Result<()> {
 
 /// Execute list-prompts command.
 async fn execute_list_prompts(project_path: PathBuf, args: cli::ListPromptsArgs) -> Result<()> {
-    info!("Listing available prompts");
-
     let config = ConfigManager::load(&project_path).with_context(|| {
         format!(
             "Failed to load configuration from {}",
