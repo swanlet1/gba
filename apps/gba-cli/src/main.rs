@@ -61,6 +61,9 @@ fn init_tracing(args: &Args) -> Result<()> {
         .add_directive("gba_pm=info".parse()?)
         .add_directive("gba_cli=info".parse()?);
 
+    // Console filter - only warnings and errors to stdout
+    let console_filter = EnvFilter::new("warn,gba_cli=warn");
+
     // Check if we have a config with log file settings
     let project_path = if args.path.as_os_str() == "." {
         std::env::current_dir().context("Failed to get current directory")?
@@ -79,11 +82,13 @@ fn init_tracing(args: &Args) -> Result<()> {
             if gba_dir.exists() {
                 Some(gba_dir.join("logs").join("gba.log"))
             } else {
-                None
+                // Use global default log location
+                get_default_log_file()
             }
         }
     } else {
-        None
+        // No config, use global default log location
+        get_default_log_file()
     };
 
     if let Some(ref file_path) = log_file {
@@ -101,7 +106,7 @@ fn init_tracing(args: &Args) -> Result<()> {
         );
 
         tracing_subscriber::registry()
-            .with(filter)
+            .with(filter.clone())
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_writer(std::io::stdout)
@@ -109,7 +114,8 @@ fn init_tracing(args: &Args) -> Result<()> {
                     .with_target(false)
                     .with_thread_ids(false)
                     .with_file(false)
-                    .with_line_number(false),
+                    .with_line_number(false)
+                    .with_filter(console_filter),
             )
             .with(
                 tracing_subscriber::fmt::layer()
@@ -122,7 +128,7 @@ fn init_tracing(args: &Args) -> Result<()> {
             )
             .init();
     } else {
-        // Console only logging
+        // Console only logging (fallback when no log file can be created)
         tracing_subscriber::registry()
             .with(filter)
             .with(
@@ -149,6 +155,14 @@ async fn execute_init(args: cli::InitArgs) -> Result<()> {
     run::init(&project_path, &args.main_branch, args.repo_url.as_deref()).await?;
 
     Ok(())
+}
+
+/// Get the default log file location.
+///
+/// Returns `~/.gba/logs/gba.log` or None if home directory cannot be determined.
+#[must_use]
+fn get_default_log_file() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| home.join(".gba").join("logs").join("gba.log"))
 }
 
 /// Execute run command.

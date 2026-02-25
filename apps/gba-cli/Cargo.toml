@@ -29,6 +29,7 @@ tracing-appender = "0.2"
 validator = { workspace = true }
 arc-swap = { workspace = true }
 atty = "0.2"
+dirs = "5"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "test-util"] }
