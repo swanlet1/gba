@@ -2,23 +2,20 @@
 
 use std::fmt;
 use std::path::PathBuf;
-use std::pin::Pin;
 
 use claude_agent_sdk_rs::{
-    ClaudeAgentOptions, ClaudeClient, ContentBlock, Message, PermissionMode, SettingSource,
-    SystemPrompt,
+    ClaudeAgentOptions, ContentBlock, Message, PermissionMode, SettingSource, SystemPrompt, query,
 };
-use futures::stream::{Stream, StreamExt};
 
 use crate::config::AgentConfig;
 use crate::context_builder::{ContextBuilderConfig, build_context};
 use crate::error::{CoreError, Result};
-use crate::task::{Context as TaskContext, Response, Task, Usage};
+use crate::task::{Context as TaskContext, Response, Task};
 
 /// Agent for interacting with Claude Agent SDK.
 ///
-/// The agent manages the lifecycle of a Claude Code session and provides
-/// methods for executing tasks with prompts and context.
+/// The agent provides methods for executing tasks with prompts and context
+/// using the Claude Agent SDK's simple query API.
 ///
 /// # Examples
 ///
@@ -29,8 +26,7 @@ use crate::task::{Context as TaskContext, Response, Task, Usage};
 /// #[tokio::main]
 /// async fn main() -> Result<(), gba_core::CoreError> {
 ///     let config = AgentConfig::default();
-///
-///     let mut agent = Agent::new(config).await?;
+///     let agent = Agent::new(config);
 ///
 ///     let response = agent.execute(
 ///         "Hello Claude",
@@ -39,28 +35,21 @@ use crate::task::{Context as TaskContext, Response, Task, Usage};
 ///
 ///     println!("{}", response.content);
 ///
-///     agent.shutdown().await?;
 ///     Ok(())
 /// }
 /// ```
 pub struct Agent {
-    /// Claude client for interacting with the SDK.
-    client: ClaudeClient,
-    /// Working directory for the agent.
-    working_dir: PathBuf,
-    /// Whether the agent is connected.
-    connected: bool,
     /// Agent configuration.
     config: AgentConfig,
+    /// Working directory for the agent.
+    working_dir: PathBuf,
 }
 
 impl fmt::Debug for Agent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Agent")
             .field("working_dir", &self.working_dir)
-            .field("connected", &self.connected)
             .field("config", &self.config)
-            .field("client", &"<ClaudeClient>")
             .finish()
     }
 }
@@ -70,13 +59,11 @@ impl Agent {
     ///
     /// # Arguments
     ///
-    /// * `config` - Agent configuration including API key and model.
+    /// * `config` - Agent configuration including model and other settings.
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - The API key is empty
-    /// - The client cannot be created
+    /// Returns an error if the working directory cannot be determined.
     ///
     /// # Examples
     ///
@@ -86,71 +73,23 @@ impl Agent {
     /// #[tokio::main]
     /// async fn main() -> Result<(), gba_core::CoreError> {
     ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.shutdown().await?;
+    ///     let agent = Agent::new(config);
     ///     Ok(())
     /// }
     /// ```
     #[tracing::instrument(skip(config))]
-    pub async fn new(config: AgentConfig) -> Result<Self> {
-        let options = Self::build_options(&config)?;
-        let client = ClaudeClient::new(options);
-
-        let working_dir = std::env::current_dir().map_err(CoreError::Io)?;
+    pub fn new(config: AgentConfig) -> Self {
+        let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
         tracing::info!("Created agent with model: {}", config.model);
 
-        Ok(Self {
-            config,
-            client,
-            working_dir,
-            connected: false,
-        })
-    }
-
-    /// Connect the agent to Claude.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The connection fails
-    /// - The initialization handshake fails
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use gba_core::{Agent, AgentConfig};
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), gba_core::CoreError> {
-    ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
-    ///     agent.shutdown().await?;
-    ///     Ok(())
-    /// }
-    /// ```
-    #[tracing::instrument(skip(self))]
-    pub async fn connect(&mut self) -> Result<()> {
-        if self.connected {
-            tracing::debug!("Agent already connected");
-            return Ok(());
-        }
-
-        tracing::info!("Connecting agent to Claude...");
-        self.client
-            .connect()
-            .await
-            .map_err(|e| CoreError::ClaudeAgent(format!("Failed to connect: {e}")))?;
-        self.connected = true;
-        tracing::info!("Agent connected successfully");
-        Ok(())
+        Self { config, working_dir }
     }
 
     /// Execute a task with the given prompt and context.
     ///
-    /// This method executes a task using the non-streaming API, collecting
-    /// all messages before returning.
+    /// This method executes a task using the query API, collecting all
+    /// messages before returning.
     ///
     /// # Arguments
     ///
@@ -160,7 +99,6 @@ impl Agent {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The agent is not connected
     /// - The query fails
     /// - The response cannot be parsed
     ///
@@ -173,8 +111,7 @@ impl Agent {
     /// #[tokio::main]
     /// async fn main() -> Result<(), gba_core::CoreError> {
     ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
+    ///     let agent = Agent::new(config);
     ///
     ///     let context = Context {
     ///         repository_path: PathBuf::from("/path/to/repo"),
@@ -189,43 +126,63 @@ impl Agent {
     ///     ).await?;
     ///
     ///     println!("{}", response.content);
-    ///     agent.shutdown().await?;
     ///     Ok(())
     /// }
     /// ```
     #[tracing::instrument(skip(self, prompt, context))]
-    pub async fn execute(&mut self, prompt: &str, context: &TaskContext) -> Result<Response> {
-        self.ensure_connected()?;
-
+    pub async fn execute(&self, prompt: &str, context: &TaskContext) -> Result<Response> {
         tracing::info!("Executing task with prompt: {}", prompt);
 
         // Build the full prompt with context
         let full_prompt = self.build_prompt(prompt, context);
 
-        // Send the query
-        self.client
-            .query(&full_prompt)
+        // Build options
+        let options = Self::build_options(&self.config)?;
+
+        // Send the query using the simple query API
+        let messages = query(&full_prompt, Some(options))
             .await
             .map_err(|e| CoreError::ClaudeAgent(format!("Failed to send query: {e}")))?;
 
         // Collect all messages
         let mut response = Response::default();
-        let mut stream = self.client.receive_response();
 
-        while let Some(message_result) = stream.next().await {
-            let message = message_result
-                .map_err(|e| CoreError::ClaudeAgent(format!("Failed to receive message: {e}")))?;
-
+        for message in &messages {
             match message {
+                Message::User(user_msg) => {
+                    // Track user messages if needed
+                    if let Some(ref content) = user_msg.content {
+                        for block in content {
+                            if let ContentBlock::Text(text) = block {
+                                tracing::debug!("User message: {}", text.text);
+                            }
+                        }
+                    }
+                }
                 Message::Assistant(msg) => {
                     for block in &msg.message.content {
-                        if let ContentBlock::Text(text) = block {
-                            response.content.push_str(&text.text);
+                        match block {
+                            ContentBlock::Text(text) => {
+                                response.content.push_str(&text.text);
+                            }
+                            ContentBlock::ToolUse(tool) => {
+                                tracing::debug!("Tool used: {} ({})", tool.name, tool.id);
+                            }
+                            ContentBlock::ToolResult(result) => {
+                                tracing::debug!("Tool result: {}", result.tool_use_id);
+                            }
+                            _ => {}
                         }
                     }
                 }
                 Message::Result(result) => {
-                    if let Some(usage) = result.usage {
+                    tracing::info!(
+                        "Query completed. Turns: {}, Duration: {}ms",
+                        result.num_turns,
+                        result.duration_ms
+                    );
+
+                    if let Some(ref usage) = result.usage {
                         // Parse usage from JSON value
                         if let Some(input_tokens) =
                             usage.get("input_tokens").and_then(|v| v.as_u64())
@@ -241,141 +198,20 @@ impl Agent {
                     if let Some(cost) = result.total_cost_usd {
                         response.usage.total_cost_usd = cost;
                     }
+                    tracing::info!(
+                        "Usage: Input tokens: {}, Output tokens: {}, Cost: ${:.4}",
+                        response.usage.input_tokens,
+                        response.usage.output_tokens,
+                        response.usage.total_cost_usd,
+                    );
                 }
-                _ => {}
+                Message::System(_) | Message::StreamEvent(_) | Message::ControlCancelRequest(_) => {
+                    // Ignore system messages, stream events, and control requests
+                }
             }
         }
 
-        tracing::info!(
-            "Task completed. Input tokens: {}, Output tokens: {}, Cost: ${:.4}",
-            response.usage.input_tokens,
-            response.usage.output_tokens,
-            response.usage.total_cost_usd,
-        );
-
         Ok(response)
-    }
-
-    /// Execute a streaming task.
-    ///
-    /// This method executes a task using the streaming API, returning a stream
-    /// of chunks as they arrive.
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - The task prompt to execute.
-    /// * `context` - The task context containing repository information.
-    ///
-    /// # Returns
-    ///
-    /// A stream of [`Chunk`] results.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The agent is not connected
-    /// - The query fails
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use gba_core::{Agent, AgentConfig, Context};
-    /// use std::path::PathBuf;
-    /// use futures::StreamExt;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), gba_core::CoreError> {
-    ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
-    ///
-    ///     let context = Context::default();
-    ///
-    ///     let mut stream = agent.execute_stream(
-    ///         "Explain Rust ownership",
-    ///         &context,
-    ///     ).await?;
-    ///
-    ///     let mut total_cost = 0.0;
-    ///     while let Some(chunk_result) = stream.next().await {
-    ///         match chunk_result? {
-    ///             gba_core::Chunk::Text(text) => print!("{}", text),
-    ///             gba_core::Chunk::Done(usage) => {
-    ///                 total_cost = usage.total_cost_usd;
-    ///             }
-    ///         }
-    ///     }
-    ///     drop(stream);
-    ///
-    ///     agent.shutdown().await?;
-    ///     Ok(())
-    /// }
-    /// ```
-    #[allow(tail_expr_drop_order)]
-    #[tracing::instrument(skip(self, prompt, context))]
-    pub async fn execute_stream<'a>(
-        &'a mut self,
-        prompt: &str,
-        context: &'a TaskContext,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Chunk>> + Send + 'a>>> {
-        self.ensure_connected()?;
-
-        tracing::info!("Executing streaming task with prompt: {}", prompt);
-
-        // Build the full prompt with context
-        let full_prompt = self.build_prompt(prompt, context);
-
-        // Send the query
-        self.client
-            .query(&full_prompt)
-            .await
-            .map_err(|e| CoreError::ClaudeAgent(format!("Failed to send query: {e}")))?;
-
-        // Return the response stream
-        Ok(Box::pin(async_stream::stream! {
-            let mut stream = self.client.receive_response();
-
-            while let Some(message_result) = stream.next().await {
-                match message_result {
-                    Ok(message) => {
-                        match message {
-                            Message::Assistant(msg) => {
-                                for block in msg.message.content {
-                                    if let ContentBlock::Text(text) = block {
-                                        yield Ok(Chunk::Text(text.text));
-                                    }
-                                }
-                            }
-                            Message::Result(result) => {
-                                let mut usage = Usage::default();
-                                if let Some(usage_value) = result.usage {
-                                    if let Some(input_tokens) =
-                                        usage_value.get("input_tokens").and_then(|v| v.as_u64())
-                                    {
-                                        usage.input_tokens = input_tokens as u32;
-                                    }
-                                    if let Some(output_tokens) =
-                                        usage_value.get("output_tokens").and_then(|v| v.as_u64())
-                                    {
-                                        usage.output_tokens = output_tokens as u32;
-                                    }
-                                }
-                                if let Some(cost) = result.total_cost_usd {
-                                    usage.total_cost_usd = cost;
-                                }
-                                yield Ok(Chunk::Done(usage));
-                            }
-                            _ => {}
-                        }
-                    }
-                    Err(e) => {
-                        yield Err(CoreError::ClaudeAgent(format!(
-                            "Failed to receive message: {e}"
-                        )));
-                    }
-                }
-            }
-        }))
     }
 
     /// Execute a task with a [`Task`] object.
@@ -391,7 +227,6 @@ impl Agent {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The agent is not connected
     /// - The query fails
     /// - The response cannot be parsed
     ///
@@ -403,51 +238,45 @@ impl Agent {
     /// #[tokio::main]
     /// async fn main() -> Result<(), gba_core::CoreError> {
     ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
+    ///     let agent = Agent::new(config);
     ///
     ///     let task = Task::with_defaults("Implement feature X", Context::default());
     ///
     ///     let response = agent.execute_task(&task).await?;
     ///     println!("{}", response.content);
-    ///
-    ///     agent.shutdown().await?;
     ///     Ok(())
     /// }
     /// ```
     #[tracing::instrument(skip(self, task))]
-    pub async fn execute_task(&mut self, task: &Task) -> Result<Response> {
-        self.ensure_connected()?;
+    pub async fn execute_task(&self, task: &Task) -> Result<Response> {
+        tracing::info!(
+            "Executing task with system prompt: {} ({} turns)",
+            task.system_prompt,
+            task.max_turns
+        );
 
-        tracing::info!("Executing task with system prompt: {}", task.system_prompt);
-
-        // Update the client options with the task's system prompt
+        // Build options with task-specific settings
         let system_prompt: SystemPrompt = task.system_prompt.clone().into();
-        let _options = ClaudeAgentOptions::builder()
+        let options = ClaudeAgentOptions::builder()
+            .model(self.config.model.clone())
             .system_prompt(system_prompt)
+            .permission_mode(PermissionMode::BypassPermissions)
+            .setting_sources(vec![SettingSource::User, SettingSource::Project])
             .max_turns(task.max_turns)
             .build();
-
-        // Note: In a real implementation, we'd need to recreate the client
-        // with the new options. For now, we'll use the existing client.
 
         // Build the full prompt with context
         let full_prompt = self.build_prompt(&task.prompt, &task.context);
 
         // Send the query
-        self.client
-            .query(&full_prompt)
+        let messages = query(&full_prompt, Some(options))
             .await
             .map_err(|e| CoreError::ClaudeAgent(format!("Failed to send query: {e}")))?;
 
         // Collect all messages
         let mut response = Response::default();
-        let mut stream = self.client.receive_response();
 
-        while let Some(message_result) = stream.next().await {
-            let message = message_result
-                .map_err(|e| CoreError::ClaudeAgent(format!("Failed to receive message: {e}")))?;
-
+        for message in &messages {
             match message {
                 Message::Assistant(msg) => {
                     for block in &msg.message.content {
@@ -457,8 +286,7 @@ impl Agent {
                     }
                 }
                 Message::Result(result) => {
-                    if let Some(usage) = result.usage {
-                        // Parse usage from JSON value
+                    if let Some(ref usage) = result.usage {
                         if let Some(input_tokens) =
                             usage.get("input_tokens").and_then(|v| v.as_u64())
                         {
@@ -474,7 +302,9 @@ impl Agent {
                         response.usage.total_cost_usd = cost;
                     }
                 }
-                _ => {}
+                Message::User(_) | Message::System(_) | Message::StreamEvent(_) | Message::ControlCancelRequest(_) => {
+                    // Ignore other message types
+                }
             }
         }
 
@@ -502,7 +332,6 @@ impl Agent {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The agent is not connected
     /// - Context building fails
     /// - The query fails
     ///
@@ -515,8 +344,7 @@ impl Agent {
     /// #[tokio::main]
     /// async fn main() -> Result<(), gba_core::CoreError> {
     ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
+    ///     let agent = Agent::new(config);
     ///
     ///     let response = agent.execute_with_context(
     ///         "Implement feature X",
@@ -525,19 +353,16 @@ impl Agent {
     ///     ).await?;
     ///
     ///     println!("{}", response.content);
-    ///     agent.shutdown().await?;
     ///     Ok(())
     /// }
     /// ```
     #[tracing::instrument(skip(self, prompt))]
     pub async fn execute_with_context(
-        &mut self,
+        &self,
         prompt: &str,
         repo_path: PathBuf,
         branch: String,
     ) -> Result<Response> {
-        self.ensure_connected()?;
-
         tracing::info!("Building context for repository: {:?}", repo_path);
 
         let context_builder_config = ContextBuilderConfig::default();
@@ -546,70 +371,16 @@ impl Agent {
         self.execute(prompt, &context).await
     }
 
-    /// Stop the agent gracefully.
-    ///
-    /// This disconnects the agent from Claude and cleans up resources.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if disconnection fails.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use gba_core::{Agent, AgentConfig};
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), gba_core::CoreError> {
-    ///     let config = AgentConfig::default();
-    ///     let mut agent = Agent::new(config).await?;
-    ///     agent.connect().await?;
-    ///
-    ///     // ... use agent ...
-    ///
-    ///     agent.shutdown().await?;
-    ///     Ok(())
-    /// }
-    /// ```
-    #[tracing::instrument(skip(self))]
-    pub async fn shutdown(mut self) -> Result<()> {
-        if self.connected {
-            tracing::info!("Shutting down agent...");
-            self.client
-                .disconnect()
-                .await
-                .map_err(|e| CoreError::ClaudeAgent(format!("Failed to disconnect: {e}")))?;
-            tracing::info!("Agent shutdown complete");
-        }
-        Ok(())
-    }
-
     /// Get the agent configuration.
     #[must_use]
-    pub fn config(&self) -> &AgentConfig {
+    pub const fn config(&self) -> &AgentConfig {
         &self.config
     }
 
     /// Get the working directory.
     #[must_use]
-    pub fn working_dir(&self) -> &PathBuf {
+    pub const fn working_dir(&self) -> &PathBuf {
         &self.working_dir
-    }
-
-    /// Check if the agent is connected.
-    #[must_use]
-    pub fn is_connected(&self) -> bool {
-        self.connected
-    }
-
-    /// Ensure the agent is connected.
-    fn ensure_connected(&self) -> Result<()> {
-        if !self.connected {
-            return Err(CoreError::ClaudeAgent(
-                "Agent not connected. Call connect() first.".to_string(),
-            ));
-        }
-        Ok(())
     }
 
     /// Build the full prompt with context.
@@ -669,15 +440,6 @@ impl Agent {
     }
 }
 
-/// A chunk from a streaming response.
-#[derive(Debug, Clone)]
-pub enum Chunk {
-    /// Text content chunk.
-    Text(String),
-    /// Response is complete with usage statistics.
-    Done(Usage),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -686,21 +448,7 @@ mod tests {
     #[test]
     fn test_build_prompt() {
         let config = AgentConfig::default();
-
-        let client = ClaudeClient::new(
-            ClaudeAgentOptions::builder()
-                .model("test-model".to_string())
-                .permission_mode(PermissionMode::BypassPermissions)
-                .setting_sources(vec![SettingSource::User])
-                .build(),
-        );
-
-        let agent = Agent {
-            config,
-            client,
-            working_dir: PathBuf::from("/"),
-            connected: false,
-        };
+        let agent = Agent::new(config);
 
         let context = Context {
             repository_path: PathBuf::from("/repo"),
@@ -713,5 +461,14 @@ mod tests {
         assert!(prompt.contains("Hello"));
         assert!(prompt.contains("/repo"));
         assert!(prompt.contains("main"));
+    }
+
+    #[test]
+    fn test_agent_new() {
+        let config = AgentConfig::default();
+        let agent = Agent::new(config);
+
+        assert!(!agent.working_dir().as_os_str().is_empty());
+        assert_eq!(agent.config().model, "claude-sonnet-4-20250514");
     }
 }

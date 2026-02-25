@@ -5,6 +5,7 @@ members = [
     "crates/gba-pm",
     "apps/gba-cli",
 ]
+exclude = ["vendors/claude-agent-sdk-rs"]
 
 [workspace.package]
 version = "0.1.0"

@@ -11,7 +11,7 @@ pub mod context_builder;
 pub mod error;
 pub mod task;
 
-pub use agent::{Agent, Chunk};
+pub use agent::Agent;
 pub use config::{
     AgentConfig, ConfigError, LimitsConfig, LoggingConfig, ProjectConfig, ProjectMetadata,
     PromptsConfig, RepositoryConfig, RepositoryMetadata, WorktreeConfig,
@@ -21,7 +21,5 @@ pub use task::{Context, Response, Task};
 
 /// Re-export common types for convenience.
 pub mod prelude {
-    pub use crate::{
-        Agent, AgentConfig, Chunk, Context, CoreError, ProjectConfig, Response, Result, Task,
-    };
+    pub use crate::{Agent, AgentConfig, Context, CoreError, ProjectConfig, Response, Result, Task};
 }
